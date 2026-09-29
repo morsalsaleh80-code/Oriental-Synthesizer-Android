@@ -1,14 +1,12 @@
 package com.example.viewmodel
 
+import android.content.Context
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.engine.Pa4xArrangerSequencer
-import com.example.engine.Pa4xAudioEngine
-import com.example.engine.Pa4xSetParser
+import com.example.engine.*
 import com.example.model.*
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -24,9 +22,8 @@ enum class Pa4xDisplayTab {
 }
 
 class Pa4xViewModel : ViewModel() {
-    private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
-    val audioEngine = Pa4xAudioEngine()
-    val sequencer = Pa4xArrangerSequencer(audioEngine, viewModelScope)
+    val audioEngine = Pa4xLowLatencyAudioEngine()
+    val sequencer = Pa4xArrangerSequencer(audioEngine as Any, viewModelScope)
 
     private val _currentTab = MutableStateFlow(Pa4xDisplayTab.PERFORMANCE)
     val currentTab: StateFlow<Pa4xDisplayTab> = _currentTab.asStateFlow()
@@ -67,6 +64,9 @@ class Pa4xViewModel : ViewModel() {
     private val _masterVolume = MutableStateFlow(0.85f)
     val masterVolume: StateFlow<Float> = _masterVolume.asStateFlow()
 
+    private val _importStatus = MutableStateFlow<String?>(null)
+    val importStatus: StateFlow<String?> = _importStatus.asStateFlow()
+
     val splitPointMidi = 48
 
     init {
@@ -98,7 +98,7 @@ class Pa4xViewModel : ViewModel() {
 
     fun triggerPad(padId: Int) {
         try {
-            audioEngine.triggerDrum(Pa4xAudioEngine.DrumType.KICK, 1.0f)
+            audioEngine.triggerDrum(Pa4xLowLatencyAudioEngine.DrumType.KICK, 1.0f)
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -124,6 +124,29 @@ class Pa4xViewModel : ViewModel() {
             sequencer.onKeysPressed(updated)
         } catch (e: Exception) {
             e.printStackTrace()
+        }
+    }
+
+    fun importSet(context: Context, uri: Uri) {
+        viewModelScope.launch(Dispatchers.Default) {
+            try {
+                _importStatus.value = "Importing..."
+                val importedSet = Pa4xBinaryParser.parseSetFromUri(context, uri)
+                if (importedSet != null) {
+                    _currentSet.value = importedSet
+                    _currentStyle.value = importedSet.styles.firstOrNull()
+                    val sounds = importedSet.sounds.ifEmpty { Pa4xSetParser.getStandardPa4xSounds() }
+                    _upper1Sound.value = sounds.getOrNull(0)
+                    _upper2Sound.value = sounds.getOrNull(1)
+                    _lowerSound.value = sounds.getOrNull(2)
+                    _importStatus.value = "Imported: ${importedSet.name}"
+                } else {
+                    _importStatus.value = "Import failed"
+                }
+            } catch (e: Exception) {
+                _importStatus.value = "Error: ${e.message}"
+                e.printStackTrace()
+            }
         }
     }
 
