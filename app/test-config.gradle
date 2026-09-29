@@ -1,0 +1,4 @@
+# Test build configuration
+apiDependencies = ['junit:junit:4.13.2', 'androidx.test.ext:junit:1.2.1']
+
+android.testBuildType = 'debug'
