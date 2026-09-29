@@ -3,3 +3,7 @@ plugins {
     id("org.jetbrains.kotlin.android") version "1.9.24" apply false
     id("org.jetbrains.kotlin.plugin.compose") version "1.9.24" apply false
 }
+
+tasks.register("clean", Delete::class) {
+    delete(rootProject.buildDir)
+}
