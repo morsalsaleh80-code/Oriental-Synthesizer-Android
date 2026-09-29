@@ -5,14 +5,12 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.ui.*
@@ -25,7 +23,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             Pa4xAppTheme {
-                Pa4xMainScreen(viewModel = viewModel())
+                Pa4xMainScreen()
             }
         }
     }
@@ -44,21 +42,15 @@ fun Pa4xMainScreen(viewModel: Pa4xViewModel = viewModel()) {
         containerColor = KorgPa4xTheme.ChassisDarkGunmetal
     ) { innerPadding ->
         Box(
-            modifier = Modifier.fillMaxSize().padding(innerPadding)
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .background(KorgPa4xTheme.ChassisDarkGunmetal)
         ) {
-            Image(
-                painter = painterResource(id = android.R.drawable.screen_background_dark),
-                contentDescription = null,
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop
-            )
-
             Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(KorgPa4xTheme.ChassisDarkGunmetal.copy(alpha = 0.88f))
+                modifier = Modifier.fillMaxSize()
             ) {
-                Pa4xTopBar(viewModel, Modifier.fillMaxWidth())
+                Pa4xTopBar(viewModel, Modifier.fillMaxWidth().height(40.dp))
 
                 Box(
                     modifier = Modifier
@@ -69,8 +61,9 @@ fun Pa4xMainScreen(viewModel: Pa4xViewModel = viewModel()) {
                     when (currentTab) {
                         Pa4xDisplayTab.PERFORMANCE -> {
                             Column(modifier = Modifier.fillMaxSize()) {
-                                KorgTouchviewMonitor(viewModel, Modifier.fillMaxWidth())
-                                KorgPhysicalControlPanel(viewModel, Modifier.fillMaxWidth().padding(top = 2.dp))
+                                KorgTouchviewMonitor(viewModel, Modifier.fillMaxWidth().weight(0.4f))
+                                Spacer(modifier = Modifier.height(2.dp))
+                                KorgPhysicalControlPanel(viewModel, Modifier.fillMaxWidth().weight(0.3f))
                             }
                         }
                         Pa4xDisplayTab.STYLE_SELECT -> Pa4xStyleSelectPanel(viewModel, Modifier.fillMaxSize())
@@ -81,7 +74,7 @@ fun Pa4xMainScreen(viewModel: Pa4xViewModel = viewModel()) {
                     }
                 }
 
-                KorgHighDefKeyboardView(viewModel, Modifier.fillMaxWidth())
+                KorgHighDefKeyboardView(viewModel, Modifier.fillMaxWidth().height(140.dp))
             }
         }
     }

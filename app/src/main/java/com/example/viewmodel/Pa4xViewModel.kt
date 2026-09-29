@@ -1,6 +1,7 @@
 package com.example.viewmodel
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.example.engine.Pa4xArrangerSequencer
 import com.example.engine.Pa4xAudioEngine
 import com.example.engine.Pa4xSetParser
@@ -11,6 +12,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 
 enum class Pa4xDisplayTab {
     PERFORMANCE,
@@ -22,9 +24,9 @@ enum class Pa4xDisplayTab {
 }
 
 class Pa4xViewModel : ViewModel() {
-    private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     val audioEngine = Pa4xAudioEngine()
-    val sequencer = Pa4xArrangerSequencer(audioEngine, appScope)
+    val sequencer = Pa4xArrangerSequencer(audioEngine, viewModelScope)
 
     private val _currentTab = MutableStateFlow(Pa4xDisplayTab.PERFORMANCE)
     val currentTab: StateFlow<Pa4xDisplayTab> = _currentTab.asStateFlow()
@@ -62,17 +64,27 @@ class Pa4xViewModel : ViewModel() {
     private val _joystickY = MutableStateFlow(0f)
     val joystickY: StateFlow<Float> = _joystickY.asStateFlow()
 
+    private val _masterVolume = MutableStateFlow(0.85f)
+    val masterVolume: StateFlow<Float> = _masterVolume.asStateFlow()
+
     val splitPointMidi = 48
 
     init {
-        val factorySet = Pa4xSetParser.getFactorySets().first()
-        _currentSet.value = factorySet
-        _currentStyle.value = factorySet.styles.firstOrNull()
-        val firstSound = factorySet.sounds.firstOrNull()
-        _upper1Sound.value = firstSound
-        _upper2Sound.value = factorySet.sounds.getOrNull(1)
-        _lowerSound.value = factorySet.sounds.getOrNull(2)
-        sequencer.start()
+        viewModelScope.launch(Dispatchers.Default) {
+            try {
+                val factorySet = Pa4xSetParser.getFactorySets().firstOrNull()
+                if (factorySet != null) {
+                    _currentSet.value = factorySet
+                    _currentStyle.value = factorySet.styles.firstOrNull()
+                    val sounds = factorySet.sounds.ifEmpty { Pa4xSetParser.getStandardPa4xSounds() }
+                    _upper1Sound.value = sounds.getOrNull(0)
+                    _upper2Sound.value = sounds.getOrNull(1)
+                    _lowerSound.value = sounds.getOrNull(2)
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
         audioEngine.start()
     }
 
@@ -85,26 +97,34 @@ class Pa4xViewModel : ViewModel() {
     }
 
     fun triggerPad(padId: Int) {
-        val set = _currentSet.value
-        val sound = set?.pads?.firstOrNull { it.id == padId }
-        if (sound != null) {
+        try {
             audioEngine.triggerDrum(Pa4xAudioEngine.DrumType.KICK, 1.0f)
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
     }
 
     fun onKeyPressed(midi: Int) {
-        val updated = _activeMidiNotes.value.toMutableSet().apply { add(midi) }
-        _activeMidiNotes.value = updated
-        val sound = _upper1Sound.value ?: Pa4xSetParser.getStandardPa4xSounds().first()
-        audioEngine.noteOn("KEYBOARD", midi, sound, 0.9f)
-        sequencer.onKeysPressed(updated)
+        try {
+            val updated = _activeMidiNotes.value.toMutableSet().apply { add(midi) }
+            _activeMidiNotes.value = updated
+            val sound = _upper1Sound.value ?: Pa4xSetParser.getStandardPa4xSounds().firstOrNull() ?: return
+            audioEngine.noteOn("KEYBOARD", midi, sound, 0.85f)
+            sequencer.onKeysPressed(updated)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 
     fun onKeyReleased(midi: Int) {
-        val updated = _activeMidiNotes.value.toMutableSet().apply { remove(midi) }
-        _activeMidiNotes.value = updated
-        audioEngine.noteOff("KEYBOARD", midi)
-        sequencer.onKeysPressed(updated)
+        try {
+            val updated = _activeMidiNotes.value.toMutableSet().apply { remove(midi) }
+            _activeMidiNotes.value = updated
+            audioEngine.noteOff("KEYBOARD", midi)
+            sequencer.onKeysPressed(updated)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 
     fun setJoystick(x: Float, y: Float) {
@@ -112,9 +132,18 @@ class Pa4xViewModel : ViewModel() {
         _joystickY.value = y.coerceIn(0f, 1f)
     }
 
+    fun setMasterVolume(volume: Float) {
+        _masterVolume.value = volume.coerceIn(0f, 1f)
+        audioEngine.setMasterVolume(volume)
+    }
+
     override fun onCleared() {
         super.onCleared()
-        sequencer.stop()
-        audioEngine.release()
+        try {
+            sequencer.stop()
+            audioEngine.release()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 }
